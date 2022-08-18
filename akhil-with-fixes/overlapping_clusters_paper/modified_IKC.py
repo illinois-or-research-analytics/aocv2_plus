@@ -5,15 +5,18 @@ import heapq as hq
 
 # Modified version of IKC.py that takes an input tsv instead of csv
 
+
 def main(args):
 
     edge_list = args.edgeList
     out_dir = args.outDir
     k = args.kvalue
 
-    edge_list_reader = nk.graphio.EdgeListReader('\t',0, continuous=False, directed=True)
+    edge_list_reader = nk.graphio.EdgeListReader(
+        "\t", 0, continuous=False, directed=True
+    )
     graph1 = edge_list_reader.read(edge_list)
-    node_id_map = edge_list_reader.getNodeMap()   
+    node_id_map = edge_list_reader.getNodeMap()
     inverted_node_id_map = dict(map(reversed, node_id_map.items()))
 
     graph, node_id_dict = format_graph(graph1)
@@ -23,14 +26,14 @@ def main(args):
 
 
 def print_clusters(clusters, out_dir, inverted_node_id_map):
-    '''
+    """
     This writes a csv containing lines with the:
     node Id, cluster nbr, and value of k for which cluster nbr was generated
     INPUT
     -----
     clusters : a list of clusters represented as lists of nodes in each cluster
     outDir : the file path and name of the ouput
-    '''
+    """
     # the index indicates the order for when the cluster number was generated
     index = 0
     k = 0
@@ -42,11 +45,13 @@ def print_clusters(clusters, out_dir, inverted_node_id_map):
             index += 1
             # print a separate line for each node in each cluster
             for node in cluster:
-                csvwriter.writerow([inverted_node_id_map[node], index, k, modularity_score])
+                csvwriter.writerow(
+                    [inverted_node_id_map[node], index, k, modularity_score]
+                )
 
 
 def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
-    '''
+    """
     INPUT
     -----
     graph                  : the full networkit graph
@@ -55,7 +60,7 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
     OUTPUT
     ------
     final_clusters : the clustering output, a list of lists with clustered nodes
-    '''
+    """
     orig_graph = nk.graphtools.subgraphFromNodes(graph, graph.iterNodes())
     L = orig_graph.numberOfEdges()
     singletons = []
@@ -72,17 +77,19 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
         # run kc on the graph to get the smallest kcore
         subgraph, max_k, kcore = kc(graph)
         if subgraph == None:
-            print ("no available subgraph")
+            print("no available subgraph")
             break
 
         # if b. above is true, add all singletons and nodes left in the graph as individual clusters
         # and break
         if max_k < k:
             for node in graph.iterNodes():
-               modularity = (-1)*(orig_graph.degree(inverted_orig_node_ids[node])/(2*L))**2
-               final_clusters.append(([inverted_orig_node_ids[node]],0,modularity))
+                modularity = (-1) * (
+                    orig_graph.degree(inverted_orig_node_ids[node]) / (2 * L)
+                ) ** 2
+                final_clusters.append(([inverted_orig_node_ids[node]], 0, modularity))
             for node in singletons:
-               final_clusters.append(([node],0,0))
+                final_clusters.append(([node], 0, 0))
             break
 
         # compute the components
@@ -92,7 +99,7 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
 
         nodes_to_remove = set()
 
-        # check components to make sure they are k-valid and m-valid 
+        # check components to make sure they are k-valid and m-valid
         # then if so, add them to a cluster or break them up to make k-valid
         # finally add them to the final_clusters and remove those nodes from the graph
         for component in components:
@@ -106,13 +113,15 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
                 if modularity > 0:
                     sub_components = [(component, modularity)]
                 else:
-                    print('failed modularity')
+                    print("failed modularity")
                     nbr_failed_modularity += 1
                     sub_components = []
                     nodes_to_remove.update(component)
-                    singletons.extend(orig_id_component(component, inverted_orig_node_ids))
+                    singletons.extend(
+                        orig_id_component(component, inverted_orig_node_ids)
+                    )
             else:
-                print('failed k-valid')
+                print("failed k-valid")
                 nbr_failed_k_valid += 1
                 sub_components = []
                 nodes_to_remove.update(component)
@@ -124,7 +133,7 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
                 cluster = []
                 for node in sub_component:
                     cluster.append(inverted_orig_node_ids[node])
-                print ('adding cluster length', len(cluster))
+                print("adding cluster length", len(cluster))
                 clusters.append((cluster, max_k, modularity))
 
             final_clusters.extend(clusters)
@@ -133,18 +142,22 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
         component_sizes = cc.getComponentSizes()
         nbr_large_components = 0
         large_components = dict()
-        for nbr,size in component_sizes.items():
+        for nbr, size in component_sizes.items():
             if size > 100:
                 nbr_large_components += 1
                 large_components[nbr] = size
-        print ('nbr components:', len(components),
-               ',  nbr components with more than 100 nodes:', nbr_large_components)
+        print(
+            "nbr components:",
+            len(components),
+            ",  nbr components with more than 100 nodes:",
+            nbr_large_components,
+        )
 
-        # remove nodes marked for removal 
+        # remove nodes marked for removal
         # (either already clustered or when a large cluster is not validly broken up)
         for node in nodes_to_remove:
             graph.removeNode(node)
-            #print ("removing node: ", inverted_orig_node_ids[node])
+            # print ("removing node: ", inverted_orig_node_ids[node])
 
         # compact the subgraph with continuous node IDs (needed for partitioning in kc)
         # and update inverted_orig_node_ids with the new IDs
@@ -156,16 +169,22 @@ def iterative_k_core_decomposition_MCS_ES(graph, k, inverted_orig_node_ids):
             temp_dict[new_id] = orig_id
         inverted_orig_node_ids = temp_dict
         graph = nk.graphtools.getCompactedGraph(graph, node_id_dict)
-        print ('nodes left in graph: ', graph.numberOfNodes())
+        print("nodes left in graph: ", graph.numberOfNodes())
 
-    print ("nbr of clusters which were rejected since they were not k-valid : ", nbr_failed_k_valid)
-    print ("nbr of clusters which were rejected since they were not modular : ", nbr_failed_modularity)
+    print(
+        "nbr of clusters which were rejected since they were not k-valid : ",
+        nbr_failed_k_valid,
+    )
+    print(
+        "nbr of clusters which were rejected since they were not modular : ",
+        nbr_failed_modularity,
+    )
 
     return final_clusters
 
 
 def kc(graph, k=None):
-    '''
+    """
     INPUT
     -----
     graph : networkit graph
@@ -175,7 +194,7 @@ def kc(graph, k=None):
     subgraph : the subgraph containing only nodes of degree k or higher
     max_k    : the the largest value of k for which there are still nodes remaining in the subgraph
     kc       : the core decomposition networkit object
-    '''
+    """
 
     # get the value of k associated with each node in the graph and store in a partition
     kc = nk.centrality.CoreDecomposition(graph, storeNodeOrder=True)
@@ -187,7 +206,7 @@ def kc(graph, k=None):
 
     # default to the maximum k value
     if k == None:
-       k = max_k
+        k = max_k
 
     save_k = k
 
@@ -201,36 +220,38 @@ def kc(graph, k=None):
         k += 1
 
     # return the subgraph with nodes from kcore members
-    print ("k value", save_k,'nbr core members', len(kcore_members))
+    print("k value", save_k, "nbr core members", len(kcore_members))
     return nk.graphtools.subgraphFromNodes(graph, kcore_members), max_k, kc
 
 
 def k_valid(component, subgraph, k):
-    #subgraph = nk.graphtools.subgraphFromNodes(graph, component)
+    # subgraph = nk.graphtools.subgraphFromNodes(graph, component)
     k_valid = True
     component_nodes = set(component)
     for node in subgraph.iterNodes():
         if node in component_nodes:
             if (subgraph.degreeIn(node) + subgraph.degreeOut(node)) < k:
-                #print ("node", node)
-                #print('fails k condition', subgraph.degree(node))
+                # print ("node", node)
+                # print('fails k condition', subgraph.degree(node))
                 k_valid = False
                 break
     return k_valid
 
 
 def modular(component, orig_graph, inverted_orig_node_ids):
-    cluster = nk.graphtools.subgraphFromNodes(orig_graph, orig_id_component(component, inverted_orig_node_ids))
+    cluster = nk.graphtools.subgraphFromNodes(
+        orig_graph, orig_id_component(component, inverted_orig_node_ids)
+    )
 
     l = orig_graph.numberOfEdges()
     ls = cluster.numberOfEdges()
     ds = 0
 
     for node in cluster.iterNodes():
-       ds += orig_graph.degreeIn(node)
-       ds += orig_graph.degreeOut(node)
+        ds += orig_graph.degreeIn(node)
+        ds += orig_graph.degreeOut(node)
 
-    return (ls/l - (ds/(2*l))**2)
+    return ls / l - (ds / (2 * l)) ** 2
 
 
 def orig_id_component(component, inverted_orig_node_ids):
@@ -243,7 +264,7 @@ def format_graph(graph1):
     graph1 = nk.graphtools.getCompactedGraph(graph1, origNodeIdDict)
 
     if graph1.isWeighted() == False:
-        print ("not weighted")
+        print("not weighted")
         weighted = nk.Graph(n=0, weighted=True, directed=True)
 
         for node in graph1.iterNodes():
@@ -254,36 +275,57 @@ def format_graph(graph1):
             if weighted.hasNode(v) == False:
                 weighted.addNode(v)
             weighted.addEdge(u, v, graph1.degreeIn(u))
-            #print (u, v, graph1.degreeIn(u))
+            # print (u, v, graph1.degreeIn(u))
         graph = weighted
     else:
         graph = graph1
 
     graph.removeSelfLoops()
 
-    print (graph.numberOfNodes())
+    print(graph.numberOfNodes())
     return graph, invertedOrigNodeIdDict
 
 
 def parseArgs():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-e", "--edgeList", type=str,
-                        help="Path to file containing edge lists",
-                        required=True, default=None)
+    parser.add_argument(
+        "-e",
+        "--edgeList",
+        type=str,
+        help="Path to file containing edge lists",
+        required=True,
+        default=None,
+    )
 
-    parser.add_argument("-o", "--outDir", type=str,
-                        help="Path to file containing output",
-                        required=True, default=None)
+    parser.add_argument(
+        "-o",
+        "--outDir",
+        type=str,
+        help="Path to file containing output",
+        required=True,
+        default=None,
+    )
 
-    parser.add_argument("-k", "--kvalue", type=int,
-                        help="non-negative integer value of the minimum required adjacent nodes for each node",
-                        required=False, default=0)
+    parser.add_argument(
+        "-k",
+        "--kvalue",
+        type=int,
+        help="non-negative integer value of the minimum required adjacent nodes for each node",
+        required=False,
+        default=0,
+    )
 
-    parser.add_argument("-v", "--version", action="version", version="1.0.0",
-                        help="show the version number and exit")
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version="1.0.0",
+        help="show the version number and exit",
+    )
 
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     main(parseArgs())

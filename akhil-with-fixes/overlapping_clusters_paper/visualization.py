@@ -4,7 +4,7 @@ import seaborn as sns
 import statistics
 
 
-'''
+"""
 Method to analyze a dictionary of information in the form of a scatterplot
 
 Input:
@@ -18,17 +18,22 @@ Input:
 
 Output:
   None
-'''
-def scatterplot_analysis(information, x_col, x_scale, y_col, y_scale, hue_val, output_file_path):
-  df = pd.DataFrame.from_dict(information)
-  
-  plt.figure()
-  ax = sns.scatterplot(data=df, x=x_col, y=y_col, hue=hue_val)
-  ax.set_xscale(x_scale)
-  ax.set_yscale(y_scale)
-  plt.savefig(output_file_path)
+"""
 
-'''
+
+def scatterplot_analysis(
+    information, x_col, x_scale, y_col, y_scale, hue_val, output_file_path
+):
+    df = pd.DataFrame.from_dict(information)
+
+    plt.figure()
+    ax = sns.scatterplot(data=df, x=x_col, y=y_col, hue=hue_val)
+    ax.set_xscale(x_scale)
+    ax.set_yscale(y_scale)
+    plt.savefig(output_file_path)
+
+
+"""
 Method to analyze a dictionary of information in the form of a scatterplot
 
 Input:
@@ -39,13 +44,18 @@ Input:
 
 Output:
   None
-'''
-def histogram_analysis(frequency_list, output_file_path, min_k_core, inclusion_criterion):
-  plt.figure()
-  print(min(frequency_list), max(frequency_list), statistics.median(frequency_list))
-  sns.histplot(frequency_list,  bins=100, log_scale = True) 
+"""
 
-  plt.xlabel('Intersection Size')
-  plt.ylabel('Frequency')
-  plt.savefig(str(min_k_core) + '_' + str(inclusion_criterion) + '_'  + output_file_path)
 
+def histogram_analysis(
+    frequency_list, output_file_path, min_k_core, inclusion_criterion
+):
+    plt.figure()
+    print(min(frequency_list), max(frequency_list), statistics.median(frequency_list))
+    sns.histplot(frequency_list, bins=100, log_scale=True)
+
+    plt.xlabel("Intersection Size")
+    plt.ylabel("Frequency")
+    plt.savefig(
+        str(min_k_core) + "_" + str(inclusion_criterion) + "_" + output_file_path
+    )
