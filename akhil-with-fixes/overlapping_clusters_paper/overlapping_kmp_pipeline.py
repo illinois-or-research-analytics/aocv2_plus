@@ -601,27 +601,38 @@ def overlapping_clusters_construction(
 
     l = G.size()
     for cluster_id, cluster_nodes in overlapping_clusters["Core Node Clusters"].items():
+        # Core Node Clusters mean the original IKC clusters
         subgraph = G.subgraph(cluster_nodes)
         ls = subgraph.size()
         ds = sum([node_info["total_degree"][node] for node in cluster_nodes])
         modularity = ls / l - (ds / (2 * l)) ** 2
-        if modularity < 0:
-            print("Original Cluster " + str(cluster_id) + " has negative modularity!")
+        if modularity <= 0:
+            print("Original Cluster " + str(cluster_id) + " has non-positive modularity!")
         nodes_added = 0
         overlapping_clusters["mcd"][cluster_id] = get_mcd(G, cluster_nodes)
+        added_candidates = set() # Baqiao added
         for node in candidates:
+            # Baqiao rewrote most this block.
             if (
-                len(node_info["neighbors"][node].intersection(cluster_nodes))
-                >= overlapping_clusters[inclusion_criterion][cluster_id]
-                and node not in cluster_nodes
+                node not in cluster_nodes and len(node_info["neighbors"][node].intersection(cluster_nodes)) >= overlapping_clusters[inclusion_criterion][cluster_id] # cluster_nodes from IKC
             ):
-                new_modularity = get_modularity(ls, ds, l, modularity, node_info, node)
+                overlapping_init_core_count = len(node_info["neighbors"][node].intersection(cluster_nodes)) #  number of neighbors to node within the original IKC cluster
+                overlapping_added_core_count = len(node_info["neighbors"][node].intersection(added_candidates)) #  number of neighbors to node within the growing cluster that have been added (i.e., not in the original IKC cluster)
+                ls_prime = ls + overlapping_init_core_count + overlapping_added_core_count # Total number of edges in the growing cluster
+                ds_prime = ds + node_info["total_degree"][node] #  total degree of the nodes in the growing cluster
+                new_modularity = recalculate_modularity(
+                    ls_prime, ds_prime, l
+                ) #  the new modularity of the growing cluster
                 if new_modularity > 0:
-                    overlapping_clusters["Full Clusters"][cluster_id].add(node)
-                    overlapping_node_to_cluster_id[node].add(cluster_id)
-                    modularity = new_modularity
+                    # this block indicates that the candidate node is accepted
+                    # because the node has passed both tests
+                    overlapping_clusters["Full Clusters"][cluster_id].add(node) # adding the node to the overlapping clusters
+                    overlapping_node_to_cluster_id[node].add(cluster_id) # maintain the data structure of pointing a node to its set of cluster ids
+                    added_candidates.add(node) # Baqiao added
+                    ls = ls_prime # remember the updated ls for the next iteration
+                    ds = ds_prime # remember the updated ds for the next iteration
                     nodes_added += 1
-        overlapping_clusters["modularity"][cluster_id] = modularity
+                    overlapping_clusters["modularity"][cluster_id] = new_modularity
 
     return overlapping_clusters, overlapping_node_to_cluster_id
 
@@ -643,8 +654,7 @@ Output:
 """
 
 
-def get_modularity(ls, ds, l, modularity, node_info, node):
-    ds += node_info["total_degree"][node]
+def recalculate_modularity(ls, ds, l):
     modularity = ls / l - (ds / (2 * l)) ** 2
     return modularity
 
