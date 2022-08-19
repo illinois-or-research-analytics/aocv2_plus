@@ -3,6 +3,11 @@
 # for Bradley et al (2019) that was then re-written in
 # Python by the rest of the team. 
 
+# This script was run on Jul 1, 2022 and generated 10
+# shuffled networks. shuffled_ikc[1-10].csv. These
+# then clustered with IKC_k10 to generate
+# shuffled_ikc[1-10].clustering
+
 # create df for citation shuffling
 
 # wrapper script that enables passing command line args to the function perm
