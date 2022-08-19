@@ -198,6 +198,7 @@ def main(
         + str(len(candidates))
         + " candidate(s) based on user chosen criteria"
     )
+    candidates = sorted(candidates, key = lambda x : node_info["total_degree"][x], reverse = True)
     logging.info("Finished Candidate Generation")
 
     """ Run Iterative OC Generation """
