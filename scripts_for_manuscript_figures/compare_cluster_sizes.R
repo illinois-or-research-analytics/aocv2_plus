@@ -1,6 +1,7 @@
 rm(list=ls())
 library(data.table)
 library(ggplot2)
+library(xtable)
 setwd('/shared/bl_aoc_redo/')
 
 # raw clustering data are here
@@ -110,3 +111,26 @@ p_ok2 <- p_ok1 + theme(axis.text=element_text(size=18),
 pdf('bl_fig1b.pdf')
 print(p_ok2)
 dev.off()
+
+# generate tables
+
+#aoc_m
+ikc_m_merge_df <- merge(ikc_m_merge[cluster_size.x==cluster_size.y][,.N,by='tag2'],
+ikc_m_merge[cluster_size.x!=cluster_size.y][,.N,by='tag2'],by.x='tag2',by.y='tag2',all.x=T)
+# no change to the single IKC50 cluster so edit table to correct recycling error from cbind.
+ikc_m_merge_df[5,3] <- 0
+colnames(ikc_m_merge_df) <- c('IKC','no_change','increase')
+xtable(ikc_m_merge_df)
+
+#aoc_k
+ikc_k_merge_df <- merge(ikc_k_merge[cluster_size.x==cluster_size.y][,.N,by='tag2'],
+ikc_k_merge[cluster_size.x!=cluster_size.y][,.N,by='tag2'],by.x='tag2',by.y='tag2',all.x=T)
+# no change to the single IKC50 cluster so edit table to correct recycling error from cbind.
+ikc_k_merge_df[5,3] <- 0
+colnames(ikc_k_merge_df) <- c('IKC','no_change','increase')
+xtable(ikc_k_merge_df)
+
+
+
+
+
