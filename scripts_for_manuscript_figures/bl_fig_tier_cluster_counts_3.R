@@ -12,71 +12,116 @@ library(data.table)
 library(ggplot2)
 
 # degree counts data
-dc <- fread('e14mrdj250cn_degree_counts.csv')
+dc <- fread('/shared/gc/e14mrdj250cn_degree_counts.csv')
 
-# AOC_k plot
-aoc_k <- fread('experiment_55/equil_IKC_10.clustering_k')
-tier_k <- fread('../aj_manuscript_data/tiervclustercount_k.csv')
+## Aug 20, 2022
+## new module that counts clusters per node and assigns tiers to each node
+## reuses blocks from bl_fig2.R
 
-aoc_k_tiers <- merge(aoc_k,tier_k,by.x='V2',by.y='node_id')
-colnames(aoc_k_tiers) <- c('node_id','aoc_cluster_id','V1.y',
-'ikc_cluster_id','cluster_count','tier_1_count','indegree')
-aoc_k_tiers[,V1.y:=NULL]
-aoc_k_tiers[,indegree:=NULL]
+# raw clustering from corrected aoc_m, and aoc_k scripts
+setwd('/shared/bl_aoc_redo/aug-19')
 
-k_merged <- merge(aoc_k_tiers,dc,by.x='node_id',by.y='integer_id')
 
-k_merged[total_degree/1000 < 0.1,gp:='1']
-k_merged[total_degree/1000 >= 0.1 & total_degree/1000 < 1,gp:='2']
-k_merged[total_degree/1000 >= 1 & total_degree/1000 < 10, gp:='3']
-k_merged[total_degree/1000 >= 10 & total_degree/1000 < 100, gp:='4']
-k_merged[total_degree/1000 >= 100, gp:='5']
+## base ikc data
+ikc10 <- fread('/shared/aj_manuscript_data/experiment_0/IKC_10_realignment.clustering')
+ikc20 <- fread('/shared/aj_manuscript_data/experiment_0/IKC_20_realignment.clustering')
+ikc30 <- fread('/shared/aj_manuscript_data/experiment_0/IKC_30_realignment.clustering')
+ikc40 <- fread('/shared/aj_manuscript_data/experiment_0/IKC_40_realignment.clustering')
+ikc50 <- fread('/shared/aj_manuscript_data/experiment_0/IKC_50_realignment.clustering')
 
-# AOC_m plot
-aoc_m <- fread('experiment_55/equil_IKC_10.clustering_mcd')
-tier_m <- fread('../aj_manuscript_data/tiervclustercount_mcd.csv')
+## corrected aoc_data
 
-aoc_m_tiers <- merge(aoc_m,tier_m,by.x='V2',by.y='node_id')
-colnames(aoc_m_tiers) <- c('node_id','aoc_cluster_id','V1.y',
-'ikc_cluster_id','cluster_count','tier_1_count','indegree')
-aoc_m_tiers[,V1.y:=NULL]
-aoc_m_tiers[,indegree:=NULL]
+#aoc_m
+ikc10_m <- fread('correct_ikc_10_redo_k.mcd.cluster')
+ikc20_m <- fread('correct_ikc_30_redo_k.mcd.cluster')
+ikc30_m <- fread('correct_ikc_30_redo_k.mcd.cluster')
+ikc40_m <- fread('correct_ikc_40_redo_k.mcd.cluster')
+ikc50_m <- fread('correct_ikc_50_redo_k.mcd.cluster')
 
-m_merged <- merge(aoc_m_tiers,dc,by.x='node_id',by.y='integer_id')
+#aoc_k
+ikc10_k <- fread('correct_ikc_10_redo_k.k.cluster')
+ikc20_k <- fread('correct_ikc_20_redo_k.k.cluster')
+ikc30_k <- fread('correct_ikc_30_redo_k.k.cluster')
+ikc40_k <- fread('correct_ikc_40_redo_k.k.cluster')
+ikc50_k <- fread('correct_ikc_50_redo_k.k.cluster')
 
-m_merged[total_degree/1000 < 0.1,gp:='1']
-m_merged[total_degree/1000 >= 0.1 & total_degree/1000 < 1,gp:='2']
-m_merged[total_degree/1000 >= 1 & total_degree/1000 < 10, gp:='3']
-m_merged[total_degree/1000 >= 10 & total_degree/1000 < 100, gp:='4']
-m_merged[total_degree/1000 >= 100, gp:='5']
+df_vec <- ls()
+ikc_list <- list()
+for (i in 1:length(df_vec)){
+ikc_list[[i]] <- get(noquote(df_vec[i]))
+}
+names(ikc_list) <- df_vec
 
-# add tags
-m_merged[,gp2:='aoc_m']
-k_merged[,gp2:='aoc_k']
-all_merged <- rbind(m_merged,k_merged)
-fwrite(all_merged,file='aoc_all_merged_fig3.csv')
-all_merged$gp2 <- factor(all_merged$gp2, levels=c('aoc_m','aoc_k'))
+# get aoc_m/k for ikc10 clusters
 
-# Remove duplicates
-t <- all_merged[,.(node_id,ikc_cluster_id,cluster_count,tier_1_count,gp,gp2)]
-t1 <- unique(t[gp2=='aoc_m'])
-t2 <- unique(t[gp2=='aoc_k'])
-all_merged_2 <- rbind(t1,t2)
+aoc_m_cluster_counts <- ikc_list$ikc10_m[,.N,by='V2'][order(-N)]
+aoc_k_cluster_counts <- ikc_list$ikc10_k[,.N,by='V2'][order(-N)]
 
-p1 <- qplot(gp,cluster_count,data=all_merged_2,geom="boxplot",group=gp,facets=.~gp2,color=gp2)+ theme_bw() +
-theme(axis.text=element_text(size=18),axis.title=element_text(size=18),legend.position="none")
+aoc_m_cluster_counts_degree <- merge(aoc_m_cluster_counts,dc,
+by.x='V2',by.y='integer_id')[,.(integer_id=V2,cluster_count=N,total_degree)]
+aoc_m_cluster_counts_degree[,tag:='aoc_m']
 
-pdf('cluster_group.pdf')
+aoc_k_cluster_counts_degree <- merge(aoc_k_cluster_counts,dc,
+by.x='V2',by.y='integer_id')[,.(integer_id=V2,cluster_count=N,total_degree)]
+aoc_k_cluster_counts_degree[,tag:='aoc_k']
+
+all_cluster_counts_degree <- rbind(aoc_m_cluster_counts_degree,aoc_k_cluster_counts_degree)
+
+#tag with groups
+# gp1 < 100
+# 100 <= gp2 < 1000
+# 1000 <= gp3 < 10000
+# 10000 <= gp4 < 100000
+# 100000 <= gp5 < Inf
+
+all_cluster_counts_degree[total_degree < 100, gp:='gp1']
+all_cluster_counts_degree[total_degree >= 100 & total_degree < 1000, gp:='gp2']
+all_cluster_counts_degree[total_degree >= 1000 & total_degree < 10000, gp:='gp3']
+all_cluster_counts_degree[total_degree >= 10000 & total_degree < 100000, gp:='gp4']
+all_cluster_counts_degree[total_degree >= 100000 & total_degree < 10000000, gp:='gp5']
+
+### end of new block
+
+all_cluster_counts_degree$tag <- factor(all_cluster_counts_degree$tag,levels=c('aoc_m','aoc_k'))
+all_cluster_counts_degree$gp <- factor(all_cluster_counts_degree$gp,levels=c('gp1','gp2','gp3','gp4','gp5'))
+
+setwd('/shared/aocv2_plus/gc/')
+p1 <- qplot(gp,cluster_count,data=all_cluster_counts_degree,geom="boxplot",group=gp,facets=.~tag,color=gp) + 
+theme_bw() + theme(axis.text=element_text(size=18),axis.title=element_text(size=18),
+legend.position="none",strip.text.x = element_text(size = 18))
+
+pdf('bl_group_cluster.pdf')
 print(p1)
 dev.off()
 
-p2 <- qplot(cluster_count,tier_1_count,data=all_merged_2,facets=gp~gp2,color=gp2) + theme_bw() +
-theme(axis.text=element_text(size=18),axis.title=element_text(size=18),legend.position="none") +
+# tier data generated by Baqiao Liu 8/20/2022
+mcd_tiers <- fread('/shared/bl_aoc_redo/aug-19/correct_ikc_10_redo_k.mcd.cluster_tiers.csv')
+k_tiers <- fread('/shared/bl_aoc_redo/aug-19/correct_ikc_10_redo_k.k.cluster_tiers.csv')
+
+mcd_tier_agg <- unique(mcd_tiers[,.(cluster_count,tier_1_count),by='node_id'][order(-cluster_count)])
+aoc_m_tier_gp <- merge(all_cluster_counts_degree[tag=='aoc_m'],mcd_tier_agg,by.x='integer_id',by.y='node_id')
+
+k_tier_agg <- unique(k_tiers[,.(cluster_count,tier_1_count),by='node_id'][order(-cluster_count)])
+
+aoc_m_tier_gp <- merge(all_cluster_counts_degree[tag=='aoc_m'],
+mcd_tier_agg,by.x=c('integer_id','cluster_count'),by.y=c('node_id','cluster_count'))
+
+aoc_k_tier_gp <- merge(all_cluster_counts_degree[tag=='aoc_k'],
+k_tier_agg,by.x=c('integer_id','cluster_count'),by.y=c('node_id','cluster_count'))
+
+all_tier_gp <- rbind(aoc_k_tier_gp,aoc_m_tier_gp)
+
+
+p2 <- qplot(cluster_count,tier_1_count,data=all_tier_gp,facets=gp~tag,color=gp) + theme_bw() + 
+theme(axis.text=element_text(size=18),axis.title=element_text(size=18),legend.position="none",
+strip.text.x = element_text(size = 18),strip.text.y = element_text(size = 18)) +
 theme(panel.spacing = unit(1, "lines"))
 
-pdf('tier_cluster.pdf')
+pdf('bl_cluster_tier.pdf')
 print(p2)
 dev.off()
+
+
 
 
 
