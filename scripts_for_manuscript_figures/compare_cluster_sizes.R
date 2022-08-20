@@ -100,7 +100,7 @@ print(p_om2)
 dev.off()
 
 p_ok1 <- qplot(log(cluster_size.x),log(cluster_size.y),data=ikc_k_merge,color=tag2) +
-xlab("cluster size original") + ylab("cluster size aoc_m") +
+xlab("cluster size original") + ylab("cluster size aoc_k") +
 geom_abline(slope=1) + theme_bw()
 
 p_ok2 <- p_ok1 + theme(axis.text=element_text(size=18),
@@ -110,17 +110,3 @@ p_ok2 <- p_ok1 + theme(axis.text=element_text(size=18),
 pdf('bl_fig1b.pdf')
 print(p_ok2)
 dev.off()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
