@@ -126,7 +126,9 @@ colnames(marker_suppl_data) <- c('cluster_number', 'ikc mcount', 'ikc size', 'ao
 library(janitor); library(xtable)
 marker_suppl_data <- clean_names(marker_suppl_data)
 print(xtable(marker_suppl_data[aoc_k_mcount >0 ]))
-fwrite(marker_suppl_data,file='~/repos/aj_manuscript/bl_marker_suppl_data.csv')
+fwrite(marker_suppl_data,file='~/repos/aj_manuscript/aocR1/bl_marker_suppl_data.csv')
+fwrite(marker_suppl_data,file='/shared/aocv2_plus/gc/bl_marker_suppl_data.csv')
+
 
 
 
