@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-import overlapping_kmp_pipeline as okmp
+import aoc as okmp
 import pandas as pd
 import statistics
 
