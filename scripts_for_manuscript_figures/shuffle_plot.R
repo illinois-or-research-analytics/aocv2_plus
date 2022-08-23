@@ -1,8 +1,13 @@
+# This script generates Figure 1 in the AOC; Assembling Overlapping Clusters manuscript by
+# Jakatdar et al. (2022).
+
+# clear workspace and set up
 rm(list=ls())
 setwd('/shared/gc')
 library(data.table)
 library(ggplot2)
 
+# 
 source('./aj_venv/collate_shuffled_results.R')
 setwd('/shared/gc')
 ikc <- fread('../aj_manuscript_data/experiment_1/k_10_totaldegree_1percent_original_cluster_stats.csv')
