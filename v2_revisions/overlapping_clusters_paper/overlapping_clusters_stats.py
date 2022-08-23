@@ -354,7 +354,7 @@ def cluster_analysis(G, output_path, clusters, node_info, is_overlapping=False):
         c1 = clusters["Full Clusters"][c_id]
         cluster_stats["cluster_id"].append(c_id)
         cluster_stats["cluster_size"].append(len(c1))
-        cluster_stats["modularity"].append(clusters["modularity"][c_id])
+        # cluster_stats["modularity"].append(clusters["modularity"][c_id])
         cluster_stats["average_95_percentile_total_degree"].append(
             average_top_n_total_degree(c1, node_info, 95)
         )
