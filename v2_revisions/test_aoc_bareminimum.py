@@ -1,10 +1,74 @@
 from aoc import main
 from click.testing import CliRunner
 
+
 def test_aoc_runs():
     """Checking if AOC runs under bare minimum flags"""
     runner = CliRunner()
-    result1 = runner.invoke(main, ['-c', 'example_data/simple/clusters.txt', '-g', 'example_data/simple/graph.txt', '--inclusion-criterion', 'k', '--candidate-file', 'example_data/simple/candidates.txt', '--min-k-core', '1', '-o', '../scratch/new_cluster.txt'])
-    assert result1.exit_code == 0
-    result2 = runner.invoke(main, ['-c', 'example_data/simple/clusters.txt', '-g', 'example_data/simple/graph.txt', '--inclusion-criterion', 'mcd', '--candidate-file', 'example_data/simple/candidates.txt', '-o', '../scratch/new_cluster.txt'])
-    assert result2.exit_code == 0
+    clusters_path = "example_data/simple/clusters.txt"
+    network_path = "example_data/simple/graph.txt"
+    candidates_path = "example_data/simple/candidates.txt"
+    aoc_k_with_candidates = runner.invoke(
+        main,
+        [
+            "-c",
+            clusters_path,
+            "-g",
+            network_path,
+            "--inclusion-criterion",
+            "k",
+            "--candidate-file",
+            candidates_path,
+            "--min-k-core",
+            "1",
+            "-o",
+            "../scratch/new_cluster.txt",
+        ],
+    )
+    assert aoc_k_with_candidates.exit_code == 0
+    aoc_m_with_candidates = runner.invoke(
+        main,
+        [
+            "-c",
+            clusters_path,
+            "-g",
+            network_path,
+            "--inclusion-criterion",
+            "mcd",
+            "--candidate-file",
+            candidates_path,
+            "-o",
+            "../scratch/new_cluster.txt",
+        ],
+    )
+    assert aoc_m_with_candidates.exit_code == 0
+    aoc_k_wo_candidates = runner.invoke(
+        main,
+        [
+            "-c",
+            clusters_path,
+            "-g",
+            network_path,
+            "--inclusion-criterion",
+            "k",
+            "--min-k-core",
+            "1",
+            "-o",
+            "../scratch/new_cluster.txt",
+        ],
+    )
+    assert aoc_k_wo_candidates.exit_code == 0
+    aoc_k_bare_minimum = runner.invoke(
+        main,
+        [
+            "-c",
+            clusters_path,
+            "-g",
+            network_path,
+            "--inclusion-criterion",
+            "k",
+            "--min-k-core",
+            "1",
+        ],
+    )
+    assert aoc_k_bare_minimum.exit_code == 0

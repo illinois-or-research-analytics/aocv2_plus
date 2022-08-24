@@ -3,6 +3,7 @@ import logging
 import random
 import os
 import statistics
+import sys
 import time
 from collections import Counter, defaultdict
 from copy import deepcopy
@@ -12,13 +13,14 @@ import numpy as np
 import overlapping_clusters_stats as ocs
 import pandas as pd
 
+
 @click.command()
 @click.option(
     "-c",
     "--clustering",
     required=True,
     type=click.Path(exists=True),
-    help="Clustering file as input for overlapping step",
+    help="Clustering as input for overlapping step",
 )
 @click.option(
     "-g",
@@ -30,9 +32,9 @@ import pandas as pd
 @click.option(
     "-o",
     "--output-path",
-    required=True,
+    required=False,
     type=click.Path(),
-    help="File path for saved output",
+    help="File path for saved output clustering",
 )
 @click.option(
     "--min-k-core",
@@ -61,8 +63,8 @@ import pandas as pd
 @click.option(
     "--candidate-criterion",
     required=False,
-    type=click.Choice(["total_degree", "indegree", "random", "seed"]),
-    help="Criterion to generate candidates for OC step",
+    type=click.Choice(["total_degree", "indegree", "random"]),
+    help="Criterion to generate candidates for the overlapping cluster step",
 )
 @click.option(
     "--candidate-file",
@@ -70,27 +72,11 @@ import pandas as pd
     type=click.Path(exists=True),
     help="File with a list of custom candidate nodes to run with",
 )
-@click.option("--stats-directory", required=False, type=click.Path())
 @click.option(
-    "--skip-basic-stats",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Skip calculating basic statistics (edge covergae, etc.)",
-)
-@click.option(
-    "--perform-marker-analysis",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Perform marker analysis....",
-)
-@click.option(
-    "--skip-save-stats",
-    is_flag=True,
-    show_default=True,
-    default=False,
-    help="Skip saving statistics to files",
+    "--stats-directory",
+    required=False,
+    type=click.Path(),
+    help="Directory to save statistics to",
 )
 def main(
     clustering,
@@ -103,21 +89,20 @@ def main(
     candidate_criterion,
     candidate_file,
     stats_directory,
-    skip_basic_stats,
-    perform_marker_analysis,
-    skip_save_stats,
 ):
     """The main logic of AOC. Note that the parameters are injected by Click."""
     logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
-    display_cluster_stats, include_markers, save_outputs = (
-        not skip_basic_stats,
-        perform_marker_analysis,
-        not skip_save_stats,
-    )
+    display_cluster_stats, save_output_stats = True, True
 
     output_prefix = (
-        os.path.join(output_path + ".stats") if not stats_directory else stats_directory
+        os.path.join(f"{output_path}.stats") if not stats_directory else stats_directory
     )
+
+    if not output_path:
+        # if the user does not specify an output path, we pretend the output should go to STDOUT.
+        # In addition, we forgo outputting statistics since it could be that the user
+        # is invoking AOC in a programmtic pipeline (reading its STDOUT) and only wants the clustering.
+        save_output_stats = False
 
     if not os.path.isdir(output_prefix):
         os.makedirs(output_prefix)
@@ -131,20 +116,6 @@ def main(
         elif min_k_core < 1:
             raise ValueError("Minimum k-core value must be greater than 0")
 
-    # Parse Marker Node File Data
-    if include_markers:
-        marker_nodes, marker_mapping = parse_marker_file("markers.csv")
-
-        # Include BLAST to marker mode node list and mapping
-        marker_nodes.append("1002157")
-        marker_mapping["1002157"] = "BLAST"
-
-        original_marker_nodes, _original_marker_mapping = parse_marker_file(
-            "original_markers.csv"
-        )
-        logging.info("Finished Parsing Marker Node File")
-    else:
-        marker_nodes = set()
     # Parse Network Data
     node_info = network_to_dict(network_file)
     G = nx.read_edgelist(
@@ -160,7 +131,7 @@ def main(
     logging.info("Finished Cluster Parsing")
 
     # Generate Original Cluster by Cluster Stats
-    if save_outputs:
+    if save_output_stats:
         _ = ocs.cluster_analysis(
             G,
             os.path.join(output_prefix, "original_cluster_stats.csv"),
@@ -175,15 +146,18 @@ def main(
     # Generate Candidates
     if candidate_file is not None:
         candidates = generate_candidate_file(candidate_file)
-    elif candidate_criterion == "seed" and include_markers:
-        # Parse Seed File
-        seeds, _ = parse_marker_file("seed_map.csv")
-        logging.info("Finished Seed Parsing")
-        candidates = set(original_marker_nodes).union(marker_nodes, seeds)
-    else:
+    elif candidate_criterion is not None:
         candidates = generate_candidates(
             node_info, rank_val, candidate_criterion, rank_type
         )
+    else:
+        logging.info(
+            "Did not specify candidates, now using all non-singleton nodes in the original cluster"
+        )
+        non_singleton_node_set = [
+            clusters["Full Clusters"][key] for key in clusters["Full Clusters"]
+        ]
+        candidates = set().union(*non_singleton_node_set)
     logging.info(
         "Generated "
         + str(len(candidates))
@@ -211,22 +185,20 @@ def main(
     )
     logging.info("Finished Overlapping Clustering Generation")
 
-    """ Generate Cluster Stats """
+    # Generic cluster stats
     if display_cluster_stats:
         cluster_stats(
             overlapping_clusters,
             node_info,
             G,
-            marker_nodes,
             output_prefix,
             min_k_core,
             inclusion_criterion,
-            save_outputs,
-            include_markers,
+            save_output_stats,
         )
         logging.info("Finished Cluster Stats")
 
-    if save_outputs:
+    if save_output_stats:
         # Generate Overlapping Cluster by Cluster Stats
         _ = ocs.cluster_analysis(
             G,
@@ -247,21 +219,23 @@ def main(
         logging.info(
             "Finished Generating Cluster Cluster Intersection Stats for Overlapping Clusters"
         )
-        # Save Final OC Output to File
-        overlapping_clusters_to_output(output_path, overlapping_clusters)
-        logging.info("Finished Saving Final Output")
+    # Save Final OC Output to either file or STDOUT
+    if not output_path:
+        overlapping_clusters_to_output(sys.stdout, overlapping_clusters)
+    else:
+        with open(output_path, "w+") as f:
+            overlapping_clusters_to_output(f, overlapping_clusters)
+    logging.info("Finished Outputting Final Overlapping Clustering")
 
 
 def cluster_stats(
     clusters,
     node_info,
     G,
-    candidates,
     output_prefix,
     min_k_core,
     inclusion_criterion,
     save_outputs,
-    include_markers,
 ):
     """
     Computes statistics for a given clustering
@@ -292,10 +266,6 @@ def cluster_stats(
         node_coverage,
     ) = basic_cluster_info(clusters, node_info)
     edge_coverage = get_edge_coverage(G, clusters)
-    if include_markers:
-        candidate_node_coverage, candidate_edge_coverage = get_coverage_node_list(
-            G, clusters, candidates
-        )
 
     logging.info(f"Num Clusters: {num_clusters}")
     logging.info(f"Num Singleton Nodes: {num_singletons}")
@@ -304,61 +274,27 @@ def cluster_stats(
     logging.info(f"Max Cluster Size: {max_size}")
     logging.info(f"Node Coverage: {node_coverage}")
     logging.info(f"Edge Coverage: {edge_coverage}")
-    if include_markers:
-        logging.info(f"Candidate Node Coverage: {candidate_node_coverage}")
-        logging.info(f"Candidate Edge Coverage: {candidate_edge_coverage}")
 
-    if save_outputs and include_markers:
+    if save_outputs:
         f = open(os.path.join(output_prefix, "cluster_basics.csv"), "a")
         f.write(
-            str(min_k_core)
-            + ","
-            + str(output_prefix)
-            + ","
-            + str(inclusion_criterion)
-            + ","
-            + str(num_clusters)
-            + ","
-            + str(num_singletons)
-            + ","
-            + str(min_size)
-            + ","
-            + str(median_size)
-            + ","
-            + str(max_size)
-            + ","
-            + str(node_coverage)
-            + ","
-            + str(edge_coverage)
-            + ","
-            + str(candidate_node_coverage)
-            + ","
-            + str(candidate_edge_coverage)
-            + "\n"
-        )
-        f.close()
-    elif save_outputs:
-        f = open(os.path.join(output_prefix, "cluster_basics.csv"), "a")
-        f.write(
-            str(min_k_core)
-            + ","
-            + str(output_prefix)
-            + ","
-            + str(inclusion_criterion)
-            + ","
-            + str(num_clusters)
-            + ","
-            + str(num_singletons)
-            + ","
-            + str(min_size)
-            + ","
-            + str(median_size)
-            + ","
-            + str(max_size)
-            + ","
-            + str(node_coverage)
-            + ","
-            + str(edge_coverage)
+            ",".join(
+                [
+                    str(s)
+                    for s in [
+                        min_k_core,
+                        output_prefix,
+                        inclusion_criterion,
+                        num_clusters,
+                        num_singletons,
+                        min_size,
+                        median_size,
+                        max_size,
+                        node_coverage,
+                        edge_coverage,
+                    ]
+                ]
+            )
             + "\n"
         )
         f.close()
@@ -562,19 +498,19 @@ def overlapping_clusters_construction(
             ):
                 overlapping_init_core_count = len(
                     node_info["neighbors"][node].intersection(cluster_nodes)
-                )  #  number of neighbors to node within the original IKC cluster
+                )  # number of neighbors to node within the original IKC cluster
                 overlapping_added_core_count = len(
                     node_info["neighbors"][node].intersection(added_candidates)
-                )  #  number of neighbors to node within the growing cluster that have been added (i.e., not in the original IKC cluster)
+                )  # number of neighbors to node within the growing cluster that have been added (i.e., not in the original IKC cluster)
                 ls_prime = (
                     ls + overlapping_init_core_count + overlapping_added_core_count
                 )  # Total number of edges in the growing cluster
                 ds_prime = (
                     ds + node_info["total_degree"][node]
-                )  #  total degree of the nodes in the growing cluster
+                )  # total degree of the nodes in the growing cluster
                 new_modularity = recalculate_modularity(
                     ls_prime, ds_prime, l
-                )  #  the new modularity of the growing cluster
+                )  # the new modularity of the growing cluster
                 if new_modularity > 0:
                     # this block indicates that the candidate node is accepted
                     # because the node has passed both tests
@@ -632,21 +568,21 @@ def get_mcd(G, cluster):
     return mcd
 
 
-def overlapping_clusters_to_output(output_path, overlapping_clusters):
+def overlapping_clusters_to_output(io, overlapping_clusters):
     """
     Method to save overlapping cluster to a clustering file
 
     Input:
-    output_path str - path to output clustering file
+    io IO - IO object for output
     overlapping_clusters {dict} - dictionary of overlapping clusters by cluster id
 
     Output:
     None
     """
-    output_path_writer = open(output_path, "w")
+
     for cluster_id, node_set in overlapping_clusters["Full Clusters"].items():
         for node in node_set:
-            output_path_writer.write(cluster_id + " " + node + "\n")
+            io.write(cluster_id + " " + node + "\n")
 
 
 def parse_marker_file(marker_file):
