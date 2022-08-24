@@ -11,7 +11,6 @@ import click
 import networkx as nx
 import numpy as np
 import overlapping_clusters_stats as ocs
-import pandas as pd
 
 
 @click.command()
@@ -20,63 +19,63 @@ import pandas as pd
     "--clustering",
     required=True,
     type=click.Path(exists=True),
-    help="Clustering as input for overlapping step",
+    help="Clustering as input for overlapping step; each line in the clustering file contains a whitespace-separated cluster_id node_id pair",
 )
 @click.option(
     "-g",
     "--network-file",
     required=True,
     type=click.Path(exists=True),
-    help="TSV edgelist of the whole network to the corresponding input clustering file",
+    help="Edgelist file (each line contains two nodes separated by whitespace), the background network of the input clustering",
 )
 @click.option(
     "-o",
     "--output-path",
     required=False,
     type=click.Path(),
-    help="File path for saved output clustering",
+    help="File path to save the output clustering; the directory of this path must already exist",
 )
 @click.option(
     "--min-k-core",
     required=False,
     type=int,
-    help="Minimum k-value for candidate addition",
+    help="Minimum k-value for candidate addition; only used if --inclusion-criterion is k",
 )
 @click.option(
     "--rank-type",
     required=False,
     type=click.Choice(["percent", "percentile"]),
-    help="Ranking metric type for candidate consideration step",
+    help="Ranking metric type for candidate consideration step; for advanced usage of non-standard candidate generation",
 )
 @click.option(
     "--rank-val",
     required=False,
     type=int,
-    help="Rank value for rank type to set as threshold for candidate consideration",
+    help="Rank value for rank type to set as threshold for candidate consideration; for advanced usage of non-standard candidate generation",
 )
 @click.option(
     "--inclusion-criterion",
     required=True,
     type=click.Choice(["k", "mcd"]),
-    help="Criterion to include candidate nodes to a cluster",
+    help="Criterion to include candidate nodes to a cluster; 'k' specifies AOC_k; 'mcd' specifies AOC_m",
 )
 @click.option(
     "--candidate-criterion",
     required=False,
     type=click.Choice(["total_degree", "indegree", "random"]),
-    help="Criterion to generate candidates for the overlapping cluster step",
+    help="Criterion to generate candidates for the overlapping cluster step; if not specified, defaults to first --candidate-file and then the nodes appearing in --clustering",
 )
 @click.option(
     "--candidate-file",
     required=False,
     type=click.Path(exists=True),
-    help="File with a list of custom candidate nodes to run with",
+    help="A newline separated list of custom candidate nodes to consider for augmenting the input clustering; has higher priority than --candidate-criterion",
 )
 @click.option(
     "--stats-directory",
     required=False,
     type=click.Path(),
-    help="Directory to save statistics to",
+    help="Directory to save statistics of the input and output clustering; if not specified, defaults to --output-path suffixed with .stats if --output-path is specified",
 )
 def main(
     clustering,
@@ -90,7 +89,7 @@ def main(
     candidate_file,
     stats_directory,
 ):
-    """The main logic of AOC. Note that the parameters are injected by Click."""
+    """Constructs an overlapping set of clusters from an input disjoint cluster."""
     logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
     display_cluster_stats, save_output_stats = True, True
 
@@ -105,8 +104,9 @@ def main(
         save_output_stats = False
 
     if not os.path.isdir(output_prefix):
-        os.makedirs(output_prefix)
-        logging.info(f"Created output directory: {output_prefix}")
+        if save_output_stats:
+            os.makedirs(output_prefix)
+            logging.info(f"Created output directory: {output_prefix}")
 
     if inclusion_criterion == "k":
         if min_k_core is None:
@@ -585,26 +585,6 @@ def overlapping_clusters_to_output(io, overlapping_clusters):
             io.write(cluster_id + " " + node + "\n")
 
 
-def parse_marker_file(marker_file):
-    """
-    Method to save overlapping cluster to a clustering file
-
-    Input:
-    marker_file str - file to csv of marker nodes
-
-    Output:
-    marker_list [list] - list of marker nodes by id
-    mapping {dict} - mapping of marker ids to their DOIs
-    """
-    mapping = defaultdict(str)
-    df = pd.read_csv(marker_file)
-    markers = df["integer_id"]
-    for index, n_id in enumerate(df["integer_id"]):
-        mapping[str(n_id)] = df["doi"][index]
-    marker_list = list(map(str, markers.tolist()))
-    return marker_list, mapping
-
-
 def network_to_dict(network_file):
     """
     Method to extract network data from network file
@@ -633,11 +613,18 @@ def network_to_dict(network_file):
     network_file_reader = open(network_file, "r")
 
     line = network_file_reader.readline()
-
+    if "," in line:
+        ikc_output_mode = True
+        logging.info("Comma separated IKC clustering format detected as input")
+    else:
+        ikc_output_mode = False
     while line != "":
-        v1, v2 = line.split()
-        v1, v2 = v1.strip(), v2.strip()
-
+        if ikc_output_mode:
+            v2, v1, _, _ = line.split(",")
+            v2, v1 = v2.strip(), v1.strip()
+        else:
+            v1, v2 = line.split()
+            v1, v2 = v1.strip(), v2.strip()
         node_info["total_degree"][v1] += 1
         node_info["outdegree"][v1] += 1
         node_info["indegree"][v1] += 0
