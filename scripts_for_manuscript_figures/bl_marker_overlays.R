@@ -54,5 +54,3 @@ xtable(dt[aoc_k >0])
 
 
 
-
-
